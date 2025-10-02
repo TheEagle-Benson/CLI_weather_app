@@ -1,5 +1,6 @@
 import requests
 from weather_codes import weather_codes
+from datetime import datetime
 
 def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana') -> tuple:
     try:
@@ -21,7 +22,7 @@ def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana') -> tup
 
 def get_responses(coordinates: tuple) -> tuple:
     lat, long = coordinates
-    url = f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={long}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m&timezone=GMT'
+    url = f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={long}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max,weather_code&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m&timezone=GMT'
 
     response = requests.get(url)
     data = response.json()
@@ -36,28 +37,32 @@ def weather_code_to_text(code: int = 0) -> str:
     description_emoji = list(weather_codes[code])
     return f'{description_emoji[1]} {description_emoji[0]}'
 
+def iso8601_to_everyday(time: str) -> str:
+    dt = datetime.fromisoformat(time)
+    readable_time = dt.strftime('%B %d, %Y %I:%M %p')
+    return readable_time
+
 
 def display_weather_info(response: tuple):
     current_units, current_values, daily_units, daily_values = response
     print(f'daily_units: {daily_units}')
     print(f'daily_values: {daily_values}')
 
-
+    print('')
+    print('Current Weather Information')
+    print('')
     print(f'Current Temperature: {current_values["temperature_2m"]} {current_units["temperature_2m"]}')
     print(f'Current Weather: {weather_code_to_text(current_values["weather_code"])}')
     print(f'Current Wind Speed: {current_values["wind_speed_10m"]} {current_units["wind_speed_10m"]}')
     print(f'Current Wind Direction: {current_values["wind_direction_10m"]} {current_units["wind_direction_10m"]}')
     print(f'Current Humidity: {current_values["relative_humidity_2m"]} {current_units["relative_humidity_2m"]}')
 
-
-
-
-
-
-
-
-
-
+    print('')
+    print('Daily Weather Information')
+    print('')
+    print('Time    | Max  Temperature(°C)    | Min  Temperature(°C)    | Precipitation Probability(%)    | Sunrise(h:m)    | Sunset(h:m)    | UV Index    | Weather Condition')
+    for index in range(0, 7):
+        print(f'{daily_values["time"][index]}    | {daily_values["temperature_2m_max"][index]}    | {daily_values["temperature_2m_min"][index]}    | {daily_values["precipitation_probability_max"][index]}    | {iso8601_to_everyday(daily_values["sunrise"][index])}    | {iso8601_to_everyday(daily_values["sunset"][index])}    | {daily_values["uv_index_max"][index]}    | {weather_code_to_text(daily_values["weather_code"][index])}')
 
 
 
