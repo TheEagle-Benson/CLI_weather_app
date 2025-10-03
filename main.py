@@ -1,23 +1,33 @@
 import requests
 from weather_codes import weather_codes
 from datetime import datetime
+from rich.console import Console
+from rich.traceback import install
+from rich.panel import Panel
+from rich.table import  Table
+console = Console()
+table = Table(show_header=True, header_style='bold magenta')
+install()
 
-def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana') -> tuple:
+
+def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana'):
     try:
         geocoding = f'https://geocoding-api.open-meteo.com/v1/search?name={place}&count=100&language=en&format=json'
         lat = None
         long = None
         res = requests.get(geocoding)
+        data = res.json()
+        if not 'results' in data:
+            return console.print('An error occurred, check your input and try again', style='bold italic red')
         for index in range(0, 100):
-            for key in res.json()['results'][index]:
-                if key == 'country' and country in res.json()['results'][index][key]:
-                    lat = res.json()['results'][index]['latitude']
-                    long = res.json()['results'][index]['longitude']
+            for key in data['results'][index]:
+                if key == 'country' and country in data['results'][index][key]:
+                    lat = data['results'][index]['latitude']
+                    long = data['results'][index]['longitude']
             break
         return lat, long
     except requests.exceptions.RequestException:
-        print('An error occurred:')
-        return None, None
+        return console.print('An error occurred', style='bold italic red')
 
 
 def get_responses(coordinates: tuple) -> tuple:
@@ -35,7 +45,7 @@ def get_responses(coordinates: tuple) -> tuple:
 
 def weather_code_to_text(code: int = 0) -> str:
     description_emoji = list(weather_codes[code])
-    return f'{description_emoji[1]} {description_emoji[0]}'
+    return f'[white]{description_emoji[1]}[/] {description_emoji[0]}'
 
 def iso8601_to_everyday(time: str) -> str:
     dt = datetime.fromisoformat(time)
@@ -44,41 +54,59 @@ def iso8601_to_everyday(time: str) -> str:
 
 
 def display_weather_info(response: tuple):
+    if not response:
+        return
     current_units, current_values, daily_units, daily_values = response
-    print(f'daily_units: {daily_units}')
-    print(f'daily_values: {daily_values}')
 
-    print('')
-    print('Current Weather Information')
-    print('')
-    print(f'Current Temperature: {current_values["temperature_2m"]} {current_units["temperature_2m"]}')
-    print(f'Current Weather: {weather_code_to_text(current_values["weather_code"])}')
-    print(f'Current Wind Speed: {current_values["wind_speed_10m"]} {current_units["wind_speed_10m"]}')
-    print(f'Current Wind Direction: {current_values["wind_direction_10m"]} {current_units["wind_direction_10m"]}')
-    print(f'Current Humidity: {current_values["relative_humidity_2m"]} {current_units["relative_humidity_2m"]}')
+    console.print(
+        Panel(
+            f'Current Temperature: [bold green]{current_values["temperature_2m"]}{current_units["temperature_2m"]}\n[/]'
+            f'Current Weather: [bold green]{weather_code_to_text(current_values["weather_code"])}\n[/]'
+            f'Current Wind Speed: [bold green]{current_values["wind_speed_10m"]} {current_units["wind_speed_10m"]}\n[/]'
+            f'Current Wind Direction: [bold green]{current_values["wind_direction_10m"]}{current_units["wind_direction_10m"]}\n[/]'
+            f'Current Humidity: [bold green]{current_values["relative_humidity_2m"]}{current_units["relative_humidity_2m"]}[/]',
+            title='Current Weather Information',
+            subtitle='Source: Open-Meteo',
+            subtitle_align='right',
+            border_style='blue',
+            style='bold',
+            highlight=True
+        )
+    )
 
     print('')
     print('Daily Weather Information')
     print('')
-    print('Time    | Max  Temperature(°C)    | Min  Temperature(°C)    | Precipitation Probability(%)    | Sunrise(h:m)    | Sunset(h:m)    | UV Index    | Weather Condition')
+    table.add_column('Time', style='cyan', no_wrap=True)
+    table.add_column('Max Temperature(°C)', style='magenta')
+    table.add_column('Min Temperature(°C)', style='magenta')
+    table.add_column('Precipitation Probability(%)', style='magenta')
+    table.add_column('Sunrise(h:m)', style='magenta')
+    table.add_column('Sunset(h:m)', style='magenta')
+    table.add_column('UV Index', style='magenta')
+    table.add_column('Weather Condition', style='magenta')
     for index in range(0, 7):
+        table.add_row(f'{daily_values["time"][index]}', f'{daily_values["temperature_2m_max"][index]}', f'{daily_values["temperature_2m_min"][index]}', f'{daily_values["precipitation_probability_max"][index]}', f'{iso8601_to_everyday(daily_values["sunrise"][index])}', f'{iso8601_to_everyday(daily_values["sunset"][index])}', f'{daily_values["uv_index_max"][index]}', f'{weather_code_to_text(daily_values["weather_code"][index])}')
         print(f'{daily_values["time"][index]}    | {daily_values["temperature_2m_max"][index]}    | {daily_values["temperature_2m_min"][index]}    | {daily_values["precipitation_probability_max"][index]}    | {iso8601_to_everyday(daily_values["sunrise"][index])}    | {iso8601_to_everyday(daily_values["sunset"][index])}    | {daily_values["uv_index_max"][index]}    | {weather_code_to_text(daily_values["weather_code"][index])}')
+    console.print(table)
 
 
 
 def main():
-    user_input = input('Enter the town and country in the format(town,country): ')
+    user_input = console.input('Enter the [italic magenta]town[/] and [italic magenta]country[/] in the [italic magenta]format town,country[/]: ')
     user_input_list = user_input.split(',')
     if len(user_input_list) != 2:
-        print('Invalid input')
+        console.print('Invalid input', style='bold red italic')
         return
     place = user_input_list[0].capitalize()
-    country = user_input_list[1].capitalize()
-    search_query = get_country_coordinates(place, country)
-    if not search_query[0]  or not search_query[1] :
-        print('Not Found, try again')
+    country = user_input_list[1].lstrip().capitalize()
+    if place == ''  or country == '':
+        console.print('Not Found, try again', style='bold red italic')
         return
+    search_query = get_country_coordinates(place, country)
     print(search_query)
+    if not search_query:
+        return
     response = get_responses(search_query)
     display_weather_info(response)
 
