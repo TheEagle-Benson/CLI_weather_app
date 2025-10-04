@@ -1,4 +1,5 @@
-import requests
+import requests, time
+from rich.box import ROUNDED
 from weather_codes import weather_codes
 from datetime import datetime
 from rich.console import Console
@@ -6,13 +7,15 @@ from rich.traceback import install
 from rich.panel import Panel
 from rich.table import  Table
 console = Console()
-table = Table(show_header=True, header_style='bold magenta')
+table = Table(show_header=True, header_style='bold magenta', box=ROUNDED, show_lines=True, title='Daily Weather Information', caption='Source: Open-Meteo', border_style='blue', title_style='bold blue', caption_style='bold italic', caption_justify='right')
 install()
 
 
 def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana'):
     try:
-        geocoding = f'https://geocoding-api.open-meteo.com/v1/search?name={place}&count=100&language=en&format=json'
+        with console.status(status=f'[bold magenta]Resolving location for {place} in {country}...[/]', spinner='earth', spinner_style='bold'):
+            time.sleep(1)
+            geocoding = f'https://geocoding-api.open-meteo.com/v1/search?name={place}&count=100&language=en&format=json'
         lat = None
         long = None
         res = requests.get(geocoding)
@@ -32,7 +35,9 @@ def get_country_coordinates(place: str = 'Accra', country: str = 'Ghana'):
 
 def get_responses(coordinates: tuple) -> tuple:
     lat, long = coordinates
-    url = f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={long}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max,weather_code&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m&timezone=GMT'
+    with console.status(status='[bold magenta]Fetching weather data...[/]', spinner='weather', spinner_style='bold'):
+        time.sleep(1)
+        url = f'https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={long}&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset,uv_index_max,weather_code&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,relative_humidity_2m&timezone=GMT'
 
     response = requests.get(url)
     data = response.json()
@@ -47,8 +52,8 @@ def weather_code_to_text(code: int = 0) -> str:
     description_emoji = list(weather_codes[code])
     return f'[white]{description_emoji[1]}[/] {description_emoji[0]}'
 
-def iso8601_to_everyday(time: str) -> str:
-    dt = datetime.fromisoformat(time)
+def iso8601_to_everyday(iso_time: str) -> str:
+    dt = datetime.fromisoformat(iso_time)
     readable_time = dt.strftime('%B %d, %Y %I:%M %p')
     return readable_time
 
@@ -73,21 +78,16 @@ def display_weather_info(response: tuple):
             highlight=True
         )
     )
-
-    print('')
-    print('Daily Weather Information')
-    print('')
-    table.add_column('Time', style='cyan', no_wrap=True)
-    table.add_column('Max Temperature(°C)', style='magenta')
-    table.add_column('Min Temperature(°C)', style='magenta')
-    table.add_column('Precipitation Probability(%)', style='magenta')
-    table.add_column('Sunrise(h:m)', style='magenta')
-    table.add_column('Sunset(h:m)', style='magenta')
-    table.add_column('UV Index', style='magenta')
-    table.add_column('Weather Condition', style='magenta')
+    table.add_column('Time', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Max Temperature(°C)', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Min Temperature(°C)', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Precipitation Probability(%)', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Sunrise', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Sunset', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('UV Index', justify='center', vertical='middle', header_style='bold white')
+    table.add_column('Weather Condition', justify='center', vertical='middle', header_style='bold white')
     for index in range(0, 7):
-        table.add_row(f'{daily_values["time"][index]}', f'{daily_values["temperature_2m_max"][index]}', f'{daily_values["temperature_2m_min"][index]}', f'{daily_values["precipitation_probability_max"][index]}', f'{iso8601_to_everyday(daily_values["sunrise"][index])}', f'{iso8601_to_everyday(daily_values["sunset"][index])}', f'{daily_values["uv_index_max"][index]}', f'{weather_code_to_text(daily_values["weather_code"][index])}')
-        print(f'{daily_values["time"][index]}    | {daily_values["temperature_2m_max"][index]}    | {daily_values["temperature_2m_min"][index]}    | {daily_values["precipitation_probability_max"][index]}    | {iso8601_to_everyday(daily_values["sunrise"][index])}    | {iso8601_to_everyday(daily_values["sunset"][index])}    | {daily_values["uv_index_max"][index]}    | {weather_code_to_text(daily_values["weather_code"][index])}')
+        table.add_row(f'{daily_values["time"][index]}', f'{daily_values["temperature_2m_max"][index]}', f'{daily_values["temperature_2m_min"][index]}', f'{daily_values["precipitation_probability_max"][index]}', f'{iso8601_to_everyday(daily_values["sunrise"][index])}', f'{iso8601_to_everyday(daily_values["sunset"][index])}', f'{daily_values["uv_index_max"][index]}', f'{weather_code_to_text(daily_values["weather_code"][index])}', style='bold green')
     console.print(table)
 
 
@@ -104,7 +104,6 @@ def main():
         console.print('Not Found, try again', style='bold red italic')
         return
     search_query = get_country_coordinates(place, country)
-    print(search_query)
     if not search_query:
         return
     response = get_responses(search_query)
